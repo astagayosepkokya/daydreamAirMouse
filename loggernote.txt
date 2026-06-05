@@ -1,0 +1,30 @@
+# Daydream Controller Final Technical Specs - 2026-06-05
+
+## 1. Bit Mapping (Verified Final)
+*Contiguous 13-bit Big-Endian sensor block starting at Bit 16.*
+
+| Component | Axis/Button | Bit Offset | Type |
+| :--- | :--- | :--- | :--- |
+| **Gyroscope** | Gyro X (Pitch) | **94** | 13-bit BE |
+| | Gyro Z (Yaw) | **107** | 13-bit BE |
+| | Gyro Y (Roll) | **120** | 13-bit BE |
+| **Touchpad** | Touch X | **128** | 5-bit LE |
+| | Touch Y | **136** | 5-bit LE |
+| **Buttons** | Touch Click | **144** | 1-bit |
+| | Home | **145** | 1-bit |
+| | App | **146** | 1-bit |
+| | Vol- | **147** | 1-bit |
+| | Vol+ | **148** | 1-bit |
+
+## 2. Final Control Logic
+- **Movement Trigger:** Any non-zero Touch (X != 0 or Y != 0).
+- **Mouse X (Left/Right):** Negated Gyro Z.
+- **Mouse Y (Up/Down):** Negated Gyro X.
+- **Left Click:** Touchpad Click.
+- **Right Click:** Home Button.
+- **Middle Click:** App Button.
+- **System Volume:** Standalone Vol+/Vol- buttons.
+
+## 3. Calibration & Tuning
+- **Reset Drift:** Press **Vol+ and Vol-** together. (3-second wait for flat surface).
+- **Adjust Speed:** **App + Vol+/-** (Step size 0.005).
