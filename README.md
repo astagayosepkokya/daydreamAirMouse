@@ -49,3 +49,4 @@ The driver decodes a 20-byte (160-bit) dense packet structure:
 
 Developed with 💖 for the VR/Open-source community. Special thanks to the reverse-engineering efforts that decoded the bit-packed protocol.
 thanks to google gemini. I didn't do anything. it generated itself, even build me a house for me to life, soon it tell me it will send me a baby. online
+so fill free to make a copy for yourself or sell it. whatever. 
