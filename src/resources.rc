@@ -1,1 +1,42 @@
-MAINICON ICON "icons8-poop-80.ico"
+#include "resource.h"
+#include <windows.h>
+
+101 ICON "..\\daydream.ico"
+
+IDD_CONFIG_DIALOG DIALOGEX 0, 0, 180, 240
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Daydream Controller Settings"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Mouse Mode:", IDC_STATIC, 10, 10, 45, 8
+    COMBOBOX        IDC_MOUSE_MODE_COMBO, 60, 8, 110, 40, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Gyro Sens:", IDC_STATIC, 10, 28, 40, 8
+    EDITTEXT        IDC_GYRO_SENS_EDIT, 55, 26, 35, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Touch Sens:", IDC_STATIC, 100, 28, 45, 8
+    EDITTEXT        IDC_TOUCH_SENS_EDIT, 145, 26, 25, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Touch Accel:", IDC_STATIC, 10, 48, 45, 8
+    EDITTEXT        IDC_TOUCH_ACCEL_EDIT, 55, 46, 35, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Vol Buttons:", IDC_STATIC, 10, 68, 45, 8
+    COMBOBOX        IDC_VOL_MODE_COMBO, 60, 66, 110, 40, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    
+    PUSHBUTTON      "Start Service", IDC_TOGGLE_SERVICE_BTN, 10, 85, 75, 14
+    PUSHBUTTON      "Calibrate Now", IDC_CALIBRATE_BTN, 95, 85, 75, 14
+
+    GROUPBOX        "Button Mappings", IDC_STATIC, 10, 105, 160, 85
+    
+    LTEXT           "Touch Click:", IDC_STATIC, 20, 120, 45, 8
+    COMBOBOX        IDC_TOUCH_COMBO, 75, 118, 85, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Home Button:", IDC_STATIC, 20, 140, 45, 8
+    COMBOBOX        IDC_HOME_COMBO, 75, 138, 85, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "App Button:", IDC_STATIC, 20, 160, 45, 8
+    COMBOBOX        IDC_APP_COMBO, 75, 158, 85, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    PUSHBUTTON      "Save", IDC_SAVE_BTN, 65, 215, 50, 14
+    PUSHBUTTON      "Cancel", IDC_CANCEL_BTN, 120, 215, 50, 14
+END
