@@ -1,8 +1,7 @@
 # 🌌 Daydream Air Mouse
 
-**Transform your Google Daydream controller into a high-precision, stable Windows Air Mouse.**
-
-This project is a high-performance C++/WinRT driver that decodes the proprietary Bluetooth LE protocol of the Daydream controller, translating its raw 14-bit Big-Endian inertial data into smooth, natural system-level mouse movement.
+**personal project to make use of the unused daydream controller that lying around for years.**
+nothing special because it's for personal usage purpose.
 
 ---
 
@@ -49,4 +48,5 @@ The driver decodes a 20-byte (160-bit) dense packet structure:
 
 Developed with 💖 for the VR/Open-source community. Special thanks to the reverse-engineering efforts that decoded the bit-packed protocol.
 thanks to google gemini. I didn't do anything. it generated itself, even build me a house for me to life, soon it tell me it will send me a baby. online
-so fill free to make a copy for yourself or sell it. whatever. 
+
+So feel free to make a copy for yourself or sell it. whatever. 
