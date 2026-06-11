@@ -15,6 +15,7 @@
 #include <bitset>
 #include <sstream>
 #include "resource.h"
+#pragma comment(lib, "gdi32.lib")
 
 using namespace winrt;
 using namespace Windows::Foundation;
@@ -114,6 +115,117 @@ struct DaydreamState {
 
 DaydreamState g_latestState;
 HWND g_hConfigDlg = NULL;
+NOTIFYICONDATA nid = { sizeof(nid) };
+
+#define WM_SHOW_OSD (WM_USER + 3)
+
+HWND g_hOSDWnd = NULL;
+std::wstring g_osdText;
+
+LRESULT CALLBACK OSDWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+
+        // Double buffering
+        HDC hdcMem = CreateCompatibleDC(hdc);
+        HBITMAP hbmMem = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+        HGDIOBJ hOldMem = SelectObject(hdcMem, hbmMem);
+
+        // Clear with transparent color key (black)
+        HBRUSH hTransBrush = CreateSolidBrush(RGB(0, 0, 0));
+        FillRect(hdcMem, &rect, hTransBrush);
+        DeleteObject(hTransBrush);
+
+        // Draw rounded rectangle filled with dark gray and a blue border
+        HBRUSH hBgBrush = CreateSolidBrush(RGB(25, 25, 25));
+        HGDIOBJ hOldBrush = SelectObject(hdcMem, hBgBrush);
+        HPEN hBorderPen = CreatePen(PS_SOLID, 2, RGB(0, 120, 215));
+        HGDIOBJ hOldPen = SelectObject(hdcMem, hBorderPen);
+
+        RoundRect(hdcMem, rect.left + 2, rect.top + 2, rect.right - 2, rect.bottom - 2, 15, 15);
+
+        SelectObject(hdcMem, hOldBrush);
+        DeleteObject(hBgBrush);
+        SelectObject(hdcMem, hOldPen);
+        DeleteObject(hBorderPen);
+
+        // Font
+        HFONT hFont = CreateFont(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+        HGDIOBJ hOldFont = SelectObject(hdcMem, hFont);
+
+        SetTextColor(hdcMem, RGB(255, 255, 255));
+        SetBkMode(hdcMem, TRANSPARENT);
+
+        // Centered text
+        DrawText(hdcMem, g_osdText.c_str(), -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+        SelectObject(hdcMem, hOldFont);
+        DeleteObject(hFont);
+
+        BitBlt(hdc, 0, 0, rect.right, rect.bottom, hdcMem, 0, 0, SRCCOPY);
+        SelectObject(hdcMem, hOldMem);
+        DeleteObject(hbmMem);
+        DeleteDC(hdcMem);
+
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+    case WM_TIMER:
+        if (wParam == 100) {
+            ShowWindow(hWnd, SW_HIDE);
+            KillTimer(hWnd, 100);
+        }
+        return 0;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+}
+
+void TriggerOSD(const wchar_t* text) {
+    g_osdText = text;
+    if (!g_hOSDWnd) {
+        int width = 300;
+        int height = 50;
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        int x = (screenWidth - width) / 2;
+        int y = 100; // Top-center position
+
+        static bool classRegistered = false;
+        HINSTANCE hInstance = GetModuleHandle(NULL);
+        if (!classRegistered) {
+            WNDCLASS wc = { 0 };
+            wc.lpfnWndProc = OSDWndProc;
+            wc.hInstance = hInstance;
+            wc.lpszClassName = L"DaydreamOSDClass";
+            RegisterClass(&wc);
+            classRegistered = true;
+        }
+
+        g_hOSDWnd = CreateWindowEx(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            L"DaydreamOSDClass", L"Daydream OSD",
+            WS_POPUP,
+            x, y, width, height,
+            NULL, NULL, hInstance, NULL
+        );
+
+        if (g_hOSDWnd) {
+            SetLayeredWindowAttributes(g_hOSDWnd, RGB(0, 0, 0), 230, LWA_COLORKEY | LWA_ALPHA);
+        }
+    }
+
+    if (g_hOSDWnd) {
+        InvalidateRect(g_hOSDWnd, NULL, TRUE);
+        ShowWindow(g_hOSDWnd, SW_SHOWNOACTIVATE);
+        SetTimer(g_hOSDWnd, 100, 1200, NULL);
+    }
+}
 
 class DaydreamController {
 private:
@@ -132,6 +244,8 @@ private:
     bool isSubscribed = false;
 
     ULONGLONG lastScrollTime = 0;
+    bool appComboTriggered = false;
+    bool homeComboTriggered = false;
 
     int GetBitsLE(const std::vector<uint8_t>& bytes, int startBit, int length) {
         int val = 0;
@@ -251,26 +365,42 @@ public:
         }
 
         if (hasPrevState) {
+            // Track when buttons are first pressed down to reset flags
+            if (state.btnApp && !prevState.btnApp) appComboTriggered = false;
+            if (state.btnHome && !prevState.btnHome) homeComboTriggered = false;
+
             // Mode Toggle: App + Home
             if (state.btnApp && state.btnHome && !prevState.btnHome) {
                 g_config.mouseMode = (g_config.mouseMode == 0) ? 1 : 0;
                 SaveConfig();
                 Beep(g_config.mouseMode == 1 ? 1200 : 800, 150);
+                PostMessage(nid.hWnd, WM_SHOW_OSD, g_config.mouseMode, 0);
+                appComboTriggered = true;
+                homeComboTriggered = true;
             }
 
             // Sensitivity Adjust: App + Vol+/-
             if (state.btnApp && state.btnVolPlus && !prevState.btnVolPlus) {
-                if (g_config.mouseMode == 0) g_config.gyroSens += 0.005f;
-                else g_config.touchSens += 0.1f;
+                if (g_config.mouseMode == 0) {
+                    g_config.gyroSens += 0.005f;
+                    PostMessage(nid.hWnd, WM_SHOW_OSD, 2, 0);
+                } else {
+                    g_config.touchSens += 0.1f;
+                    PostMessage(nid.hWnd, WM_SHOW_OSD, 3, 0);
+                }
                 Beep(1000, 50); SaveConfig();
+                appComboTriggered = true;
             }
             if (state.btnApp && state.btnVolMinus && !prevState.btnVolMinus) {
                 if (g_config.mouseMode == 0) {
                     g_config.gyroSens -= 0.005f; if (g_config.gyroSens < 0.005f) g_config.gyroSens = 0.005f;
+                    PostMessage(nid.hWnd, WM_SHOW_OSD, 2, 0);
                 } else {
                     g_config.touchSens -= 0.1f; if (g_config.touchSens < 0.1f) g_config.touchSens = 0.1f;
+                    PostMessage(nid.hWnd, WM_SHOW_OSD, 3, 0);
                 }
                 Beep(500, 50); SaveConfig();
+                appComboTriggered = true;
             }
 
             // Volume/Scroll/Page Mapping
@@ -287,9 +417,21 @@ public:
 
             // Standard Button Actions
             if (state.btnClick != prevState.btnClick) SendMouseBtn(g_config.touchAction, state.btnClick);
-            if (state.btnHome != prevState.btnHome && !state.btnApp) SendMouseBtn(g_config.homeAction, state.btnHome);
-            if (state.btnApp != prevState.btnApp && !state.btnVolPlus && !state.btnVolMinus && !state.btnHome) {
-                SendMouseBtn(g_config.appAction, state.btnApp);
+            
+            // Home button release triggers normal action if it wasn't part of a combo
+            if (!state.btnHome && prevState.btnHome) {
+                if (!homeComboTriggered && !state.btnApp) {
+                    SendMouseBtn(g_config.homeAction, true);
+                    SendMouseBtn(g_config.homeAction, false);
+                }
+            }
+            
+            // App button release triggers normal action if it wasn't part of a combo
+            if (!state.btnApp && prevState.btnApp) {
+                if (!appComboTriggered && !state.btnVolPlus && !state.btnVolMinus && !state.btnHome) {
+                    SendMouseBtn(g_config.appAction, true);
+                    SendMouseBtn(g_config.appAction, false);
+                }
             }
 
             int dx = 0, dy = 0;
@@ -357,7 +499,6 @@ public:
     bool IsSubscribed() { return isSubscribed; }
 };
 
-NOTIFYICONDATA nid = { sizeof(nid) };
 DaydreamController controller;
 
 INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -405,6 +546,20 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             ss << L"Orient: R:" << (g_latestState.roll/100*100) << L" Y:" << (g_latestState.yaw/100*100) << L" P:" << (g_latestState.pitch/100*100) << L"\n";
             ss << L"Accel: X:" << (g_latestState.accX/100*100) << L" Z:" << (g_latestState.accZ/100*100) << L" Y:" << (g_latestState.accY/100*100);
             SetDlgItemText(hwnd, IDC_RAW_DATA_STATIC, ss.str().c_str());
+
+            HWND hMode = GetDlgItem(hwnd, IDC_MOUSE_MODE_COMBO);
+            if (hMode) {
+                int curSel = (int)SendMessage(hMode, CB_GETCURSEL, 0, 0);
+                if (curSel != g_config.mouseMode) {
+                    SendMessage(hMode, CB_SETCURSEL, g_config.mouseMode, 0);
+                }
+            }
+        }
+        break;
+    case WM_SYSCOMMAND:
+        if ((wParam & 0xFFF0) == SC_MINIMIZE) {
+            ShowWindow(hwnd, SW_HIDE);
+            return (INT_PTR)TRUE;
         }
         break;
     case WM_COMMAND:
@@ -426,11 +581,17 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             g_config.touchAction = (int)SendMessage(GetDlgItem(hwnd, IDC_TOUCH_COMBO), CB_GETCURSEL, 0, 0);
             g_config.homeAction = (int)SendMessage(GetDlgItem(hwnd, IDC_HOME_COMBO), CB_GETCURSEL, 0, 0);
             g_config.appAction = (int)SendMessage(GetDlgItem(hwnd, IDC_APP_COMBO), CB_GETCURSEL, 0, 0);
-            SaveConfig(); KillTimer(hwnd, 2); g_hConfigDlg = NULL; EndDialog(hwnd, IDOK);
+            SaveConfig();
+            TriggerOSD(L"Settings Saved");
             return (INT_PTR)TRUE;
         }
         if (LOWORD(wParam) == IDC_CANCEL_BTN) {
-            KillTimer(hwnd, 2); g_hConfigDlg = NULL; EndDialog(hwnd, IDCANCEL);
+            KillTimer(hwnd, 2);
+            g_hConfigDlg = NULL;
+            EndDialog(hwnd, IDCANCEL);
+            Shell_NotifyIcon(NIM_DELETE, &nid);
+            if (g_hOSDWnd) DestroyWindow(g_hOSDWnd);
+            PostQuitMessage(0);
             return (INT_PTR)TRUE;
         }
         if (LOWORD(wParam) == IDC_CALIBRATE_BTN) {
@@ -439,7 +600,12 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         }
         break;
     case WM_CLOSE:
-        KillTimer(hwnd, 2); g_hConfigDlg = NULL; EndDialog(hwnd, IDCANCEL);
+        KillTimer(hwnd, 2);
+        g_hConfigDlg = NULL;
+        EndDialog(hwnd, IDCANCEL);
+        Shell_NotifyIcon(NIM_DELETE, &nid);
+        if (g_hOSDWnd) DestroyWindow(g_hOSDWnd);
+        PostQuitMessage(0);
         return (INT_PTR)TRUE;
     }
     return (INT_PTR)FALSE;
@@ -447,7 +613,9 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_TRAYICON) {
-        if (LOWORD(lParam) == WM_RBUTTONUP) {
+        if (LOWORD(lParam) == WM_LBUTTONUP) {
+            PostMessage(hWnd, WM_COMMAND, ID_TRAY_SETTINGS, 0);
+        } else if (LOWORD(lParam) == WM_RBUTTONUP) {
             POINT pt; GetCursorPos(&pt);
             HMENU hMenu = CreatePopupMenu();
             AppendMenu(hMenu, MF_STRING, ID_TRAY_SETTINGS, L"Settings...");
@@ -457,15 +625,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, pt.x, pt.y, 0, hWnd, NULL);
             DestroyMenu(hMenu);
         }
+    } else if (message == WM_SHOW_OSD) {
+        int mode = (int)wParam;
+        wchar_t buf[128];
+        if (mode == 0) {
+            TriggerOSD(L"Mode: Gyroscope");
+        } else if (mode == 1) {
+            TriggerOSD(L"Mode: Touchpad");
+        } else if (mode == 2) {
+            swprintf_s(buf, L"Gyro Sens: %.3f", g_config.gyroSens);
+            TriggerOSD(buf);
+        } else if (mode == 3) {
+            swprintf_s(buf, L"Touch Sens: %.2f", g_config.touchSens);
+            TriggerOSD(buf);
+        }
     } else if (message == WM_COMMAND) {
         if (LOWORD(wParam) == ID_TRAY_EXIT) {
             Shell_NotifyIcon(NIM_DELETE, &nid);
+            if (g_hOSDWnd) DestroyWindow(g_hOSDWnd);
+            if (g_hConfigDlg) EndDialog(g_hConfigDlg, IDCANCEL);
             PostQuitMessage(0);
         } else if (LOWORD(wParam) == ID_TRAY_SETTINGS) {
-            if (!g_hConfigDlg) DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_CONFIG_DIALOG), hWnd, ConfigDlgProc);
+            if (g_hConfigDlg) {
+                ShowWindow(g_hConfigDlg, SW_SHOW);
+                SetForegroundWindow(g_hConfigDlg);
+            } else {
+                DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_CONFIG_DIALOG), hWnd, ConfigDlgProc);
+            }
         }
     } else if (message == WM_DESTROY) {
         Shell_NotifyIcon(NIM_DELETE, &nid);
+        if (g_hOSDWnd) DestroyWindow(g_hOSDWnd);
+        if (g_hConfigDlg) EndDialog(g_hConfigDlg, IDCANCEL);
         PostQuitMessage(0);
     } else if (message == WM_TIMER) {
         if (wParam == 1 && !controller.IsSubscribed()) controller.TrySubscribe();
