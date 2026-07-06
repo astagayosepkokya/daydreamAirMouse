@@ -7,31 +7,38 @@ nothing special because it's for personal usage purpose.
 
 ## ✨ Key Features
 
-*   **🚀 Gyroscope-Driven Precision:** Unlike traditional orientation-based drivers, this implementation uses raw rotation speed (Gyroscope) to eliminate **Gimbal Lock** and axis flipping at high angles.
-*   **🎯 Touch-to-Move Trigger:** Features a "Dead-Man's Switch" logic—the cursor only moves when you are physically touching the touchpad, preventing accidental drift during idle handling.
-*   **🛠️ Advanced Calibration:** Integrated non-blocking calibration with a 3-second countdown. Press `Vol+` and `Vol-` together to zero out any environmental drift.
+*   **🛡️ Safety Launch:** Prevents duplicate instances; automatically opens Settings on startup for easy status monitoring.
+*   **🎮 Dual-Mode Mouse:** Toggle between high-precision **Gyroscope Air Mouse** and relative **Touchpad Mode** (Trackpad style).
+*   **⚡ Independent Tuning:** Separate sensitivity and acceleration settings for both modes, persisted in `config.ini`.
 *   **🖱️ Custom Button Mapping:**
-    *   **Touchpad Click:** Left Mouse Click
-    *   **Home Button:** Right Mouse Click
-    *   **App Button:** Middle Mouse Click
-    *   **Volume Keys:** Native Windows System Volume control.
-*   **⚡ Real-time Speed Tuning:** Adjust mouse sensitivity on the fly by holding `App` and pressing `Vol+` or `Vol-`.
-*   **📦 Lightweight & Native:** Built with modern C++20 and WinRT, running with minimal CPU overhead as a native Windows application.
+    *   **Touchpad Click, Home, App:** Fully remappable to Left, Right, or Middle click.
+    *   **Volume Keys:** Switchable between Volume control, Mouse Scrolling, or Page Up/Down.
+*   **📐 Guided Calibration:** Simple manual trigger with guided instructions and success notifications to ensure perfect stability.
+*   **🔄 Quick Mode Toggle:** Switch modes on-the-fly using the `App + Home` button combo.
+*   **📦 Tray-Based Service:** Runs silently in the system tray with a right-click Exit menu.
 
 ---
 
 ## 🛠️ Technical Specifications
 
-The driver decodes a 20-byte (160-bit) dense packet structure:
-*   **Endianness:** Big-Endian (BE) for sensors, Little-Endian (LE) for buttons/touch.
-*   **Resolution:** 13-bit fragments for motion sensors.
-*   **Trigger Logic:** Coordinate-based capacitive detection.
+The driver decodes a 20-byte (160-bit) dense packet structure via BLE Service `0000fe55` and Characteristic `00000001`.
 
-| Component | Function | Offset |
-| :--- | :--- | :--- |
-| **Gyro X** | Pitch (Mouse Y) | Bit 94 |
-| **Gyro Z** | Yaw (Mouse X) | Bit 107 |
-| **Touchpad** | Activity Trigger | Bits 128/136 |
+### Bit Address Mapping
+| Component | Type | Start Bit | Length | Endian |
+| :--- | :--- | :--- | :--- | :--- |
+| **Orientation X/Y/Z** | Sensor | 16 / 29 / 42 | 13 bits | Big Endian |
+| **Accel X/Y/Z** | Sensor | 55 / 68 / 81 | 13 bits | Big Endian |
+| **Gyro X (Pitch)** | Sensor | 94 | 13 bits | Big Endian |
+| **Gyro Z (Yaw)** | Sensor | 107 | 13 bits | Big Endian |
+| **Gyro Y (Roll)** | Sensor | 120 | 13 bits | Big Endian |
+| **Touch X** | Coordinate | 128 | 5 bits | Little Endian |
+| **Touch Y** | Coordinate | 136 | 5 bits | Little Endian |
+| **Touch Click** | Button | 144 | 1 bit | Little Endian |
+| **Home Button** | Button | 145 | 1 bit | Little Endian |
+| **App Button** | Button | 146 | 1 bit | Little Endian |
+| **Volume Minus** | Button | 147 | 1 bit | Little Endian |
+| **Volume Plus** | Button | 148 | 1 bit | Little Endian |
+| **Battery Level** | Status | 152 | 7 bits | Little Endian |
 
 ---
 
@@ -39,8 +46,10 @@ The driver decodes a 20-byte (160-bit) dense packet structure:
 
 1.  **Pair your controller:** Open Windows Bluetooth settings and pair your "Daydream controller".
 2.  **Build:** Run `build.bat` (requires Visual Studio Community or Build Tools).
-3.  **Run:** Launch `daydream.exe`.
-4.  **Calibrate:** Hold the controller steady and press `Vol+ + Vol-`. Wait 3 seconds for the beep.
+3.  **Run:** Launch `daydream.exe`. The Settings window will open automatically.
+4.  **Configure:** Set your preferred sensitivities and button mappings.
+5.  **Calibrate:** Click "Calibrate Now" and follow the on-screen instructions.
+6.  **Enjoy:** Close the settings window to hide it in the tray. Use `App + Home` to toggle modes at any time.
 
 ---
 

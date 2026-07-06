@@ -1,1 +1,57 @@
-MAINICON ICON "icons8-poop-80.ico"
+#include "resource.h"
+#include <windows.h>
+
+101 ICON "..\\daydream.ico"
+
+IDD_CONFIG_DIALOG DIALOGEX 0, 0, 180, 340
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "Daydream Controller Settings"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Mouse Mode:", IDC_STATIC, 10, 10, 45, 8
+    COMBOBOX        IDC_MOUSE_MODE_COMBO, 60, 8, 110, 40, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Gyro Sens:", IDC_STATIC, 10, 28, 40, 8
+    EDITTEXT        IDC_GYRO_SENS_EDIT, 55, 26, 35, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Touch Sens:", IDC_STATIC, 100, 28, 45, 8
+    EDITTEXT        IDC_TOUCH_SENS_EDIT, 145, 26, 25, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Touch Accel:", IDC_STATIC, 10, 48, 45, 8
+    EDITTEXT        IDC_TOUCH_ACCEL_EDIT, 55, 46, 35, 14, ES_AUTOHSCROLL
+
+    LTEXT           "Vol Buttons:", IDC_STATIC, 10, 68, 45, 8
+    COMBOBOX        IDC_VOL_MODE_COMBO, 60, 66, 110, 40, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    
+    PUSHBUTTON      "Start Service", IDC_TOGGLE_SERVICE_BTN, 10, 85, 75, 14
+    PUSHBUTTON      "Calibrate Now", IDC_CALIBRATE_BTN, 95, 85, 75, 14
+
+    GROUPBOX        "Button Mappings", IDC_STATIC, 10, 105, 160, 200
+    
+    LTEXT           "Touch C:", IDC_STATIC, 20, 120, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_C, 75, 118, 85, 14
+
+    LTEXT           "Touch U:", IDC_STATIC, 20, 140, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_U, 75, 138, 85, 14
+
+    LTEXT           "Touch R:", IDC_STATIC, 20, 160, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_R, 75, 158, 85, 14
+
+    LTEXT           "Touch D:", IDC_STATIC, 20, 180, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_D, 75, 178, 85, 14
+
+    LTEXT           "Touch L:", IDC_STATIC, 20, 200, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_L, 75, 198, 85, 14
+
+    LTEXT           "Pad Click:", IDC_STATIC, 20, 220, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_TOUCH_CLICK, 75, 218, 85, 14
+
+    LTEXT           "Home Button:", IDC_STATIC, 20, 240, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_HOME, 75, 238, 85, 14
+
+    LTEXT           "App Button:", IDC_STATIC, 20, 260, 50, 8
+    PUSHBUTTON      "...", IDC_BTN_APP, 75, 258, 85, 14
+
+    PUSHBUTTON      "Save", IDC_SAVE_BTN, 65, 315, 50, 14
+    PUSHBUTTON      "Cancel", IDC_CANCEL_BTN, 120, 315, 50, 14
+END
