@@ -30,19 +30,25 @@ const guid CHAR_UUID{ 0x00000001, 0x1000, 0x1000, { 0x80, 0x00, 0x00, 0x80, 0x5f
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
 
+struct ActionMap {
+    int mod = 0;
+    int key = 0;
+};
+
 struct AppConfig {
-    int mouseMode = 0; // 0: Gyro, 1: Touchpad
-    int volMode = 0;   // 0: Vol, 1: Scroll, 2: Page
+    int mouseMode = 0; 
+    int volMode = 0;   
     float gyroSens = 0.025f;
     float touchSens = 1.0f;
     float touchAccel = 1.5f;    
-    int touchCAction = 0; 
-    int touchUAction = 3; 
-    int touchRAction = 3; 
-    int touchDAction = 3; 
-    int touchLAction = 3; 
-    int homeAction = 1;  
-    int appAction = 2;   
+    ActionMap padClick = {0, 0};
+    ActionMap touchC = {0, 0}; 
+    ActionMap touchU = {0, 3}; 
+    ActionMap touchR = {0, 3}; 
+    ActionMap touchD = {0, 3}; 
+    ActionMap touchL = {0, 3}; 
+    ActionMap home = {0, 1};  
+    ActionMap app = {0, 2};   
 };
 
 AppConfig g_config;
@@ -68,13 +74,22 @@ void LoadConfig() {
     GetPrivateProfileString(L"Settings", L"TouchAccel", L"1.5", buf, 64, path);
     g_config.touchAccel = std::wcstof(buf, nullptr);
 
-    g_config.touchCAction = GetPrivateProfileInt(L"Mappings", L"TouchC", 0, path);
-    g_config.touchUAction = GetPrivateProfileInt(L"Mappings", L"TouchU", 3, path);
-    g_config.touchRAction = GetPrivateProfileInt(L"Mappings", L"TouchR", 3, path);
-    g_config.touchDAction = GetPrivateProfileInt(L"Mappings", L"TouchD", 3, path);
-    g_config.touchLAction = GetPrivateProfileInt(L"Mappings", L"TouchL", 3, path);
-    g_config.homeAction = GetPrivateProfileInt(L"Mappings", L"Home", 1, path);
-    g_config.appAction = GetPrivateProfileInt(L"Mappings", L"App", 2, path);
+    g_config.padClick.key = GetPrivateProfileInt(L"Mappings", L"PadClick", 0, path);
+    g_config.padClick.mod = GetPrivateProfileInt(L"Mappings", L"PadClickMod", 0, path);
+    g_config.touchC.key = GetPrivateProfileInt(L"Mappings", L"TouchC", 0, path);
+    g_config.touchC.mod = GetPrivateProfileInt(L"Mappings", L"TouchCMod", 0, path);
+    g_config.touchU.key = GetPrivateProfileInt(L"Mappings", L"TouchU", 3, path);
+    g_config.touchU.mod = GetPrivateProfileInt(L"Mappings", L"TouchUMod", 0, path);
+    g_config.touchR.key = GetPrivateProfileInt(L"Mappings", L"TouchR", 3, path);
+    g_config.touchR.mod = GetPrivateProfileInt(L"Mappings", L"TouchRMod", 0, path);
+    g_config.touchD.key = GetPrivateProfileInt(L"Mappings", L"TouchD", 3, path);
+    g_config.touchD.mod = GetPrivateProfileInt(L"Mappings", L"TouchDMod", 0, path);
+    g_config.touchL.key = GetPrivateProfileInt(L"Mappings", L"TouchL", 3, path);
+    g_config.touchL.mod = GetPrivateProfileInt(L"Mappings", L"TouchLMod", 0, path);
+    g_config.home.key = GetPrivateProfileInt(L"Mappings", L"Home", 1, path);
+    g_config.home.mod = GetPrivateProfileInt(L"Mappings", L"HomeMod", 0, path);
+    g_config.app.key = GetPrivateProfileInt(L"Mappings", L"App", 2, path);
+    g_config.app.mod = GetPrivateProfileInt(L"Mappings", L"AppMod", 0, path);
 }
 
 void SaveConfig() {
@@ -97,20 +112,22 @@ void SaveConfig() {
     swprintf_s(buf, L"%.4f", g_config.touchAccel);
     WritePrivateProfileString(L"Settings", L"TouchAccel", buf, path);
 
-    swprintf_s(buf, L"%d", g_config.touchCAction);
-    WritePrivateProfileString(L"Mappings", L"TouchC", buf, path);
-    swprintf_s(buf, L"%d", g_config.touchUAction);
-    WritePrivateProfileString(L"Mappings", L"TouchU", buf, path);
-    swprintf_s(buf, L"%d", g_config.touchRAction);
-    WritePrivateProfileString(L"Mappings", L"TouchR", buf, path);
-    swprintf_s(buf, L"%d", g_config.touchDAction);
-    WritePrivateProfileString(L"Mappings", L"TouchD", buf, path);
-    swprintf_s(buf, L"%d", g_config.touchLAction);
-    WritePrivateProfileString(L"Mappings", L"TouchL", buf, path);
-    swprintf_s(buf, L"%d", g_config.homeAction);
-    WritePrivateProfileString(L"Mappings", L"Home", buf, path);
-    swprintf_s(buf, L"%d", g_config.appAction);
-    WritePrivateProfileString(L"Mappings", L"App", buf, path);
+    auto saveMap = [&](const wchar_t* name, ActionMap map) {
+        swprintf_s(buf, L"%d", map.key);
+        WritePrivateProfileString(L"Mappings", name, buf, path);
+        std::wstring modName = std::wstring(name) + L"Mod";
+        swprintf_s(buf, L"%d", map.mod);
+        WritePrivateProfileString(L"Mappings", modName.c_str(), buf, path);
+    };
+
+    saveMap(L"PadClick", g_config.padClick);
+    saveMap(L"TouchC", g_config.touchC);
+    saveMap(L"TouchU", g_config.touchU);
+    saveMap(L"TouchR", g_config.touchR);
+    saveMap(L"TouchD", g_config.touchD);
+    saveMap(L"TouchL", g_config.touchL);
+    saveMap(L"Home", g_config.home);
+    saveMap(L"App", g_config.app);
 }
 
 DWORD GetMouseFlag(int action, bool down) {
@@ -295,11 +312,44 @@ private:
         SendInput(1, &input, sizeof(INPUT));
     }
 
+    void SendAction(ActionMap act, bool down) {
+        if (act.key == 0 && act.mod == 0) return;
+        if (down) {
+            if (act.mod != 0) SendSingle(act.mod, true);
+            if (act.key != 0) SendSingle(act.key, true);
+        } else {
+            if (act.key != 0) SendSingle(act.key, false);
+            if (act.mod != 0) SendSingle(act.mod, false);
+        }
+    }
+
+    void SendSingle(int vk, bool down) {
+        if (vk == 0) return; // None
+        if (vk == VK_LBUTTON) { SendMouseBtn(0, down); return; }
+        if (vk == VK_RBUTTON) { SendMouseBtn(1, down); return; }
+        if (vk == VK_MBUTTON) { SendMouseBtn(2, down); return; }
+        if (vk == VK_XBUTTON1) { SendMouseBtn(3, down); return; } // just mapping 3 to X1 if needed
+        SendKey(vk, down);
+    }
+
     void SendKey(WORD vk, bool down) {
         INPUT input = {0};
         input.type = INPUT_KEYBOARD;
-        input.ki.wVk = vk;
-        input.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP;
+        
+        UINT scancode = MapVirtualKey(vk, MAPVK_VK_TO_VSC);
+        input.ki.wScan = scancode;
+        input.ki.wVk = vk; // Some apps prefer both
+        
+        input.ki.dwFlags = KEYEVENTF_SCANCODE | (down ? 0 : KEYEVENTF_KEYUP);
+        
+        switch (vk) {
+            case VK_LEFT: case VK_UP: case VK_RIGHT: case VK_DOWN:
+            case VK_PRIOR: case VK_NEXT: case VK_END: case VK_HOME:
+            case VK_INSERT: case VK_DELETE: case VK_DIVIDE: case VK_NUMLOCK:
+                input.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
+                break;
+        }
+
         SendInput(1, &input, sizeof(INPUT));
     }
 
@@ -431,60 +481,99 @@ public:
                 else if (g_config.volMode == 2) { SendKey(VK_NEXT, true); SendKey(VK_NEXT, false); }
             }
 
-            // Standard Button Actions
-            static int activeTouchArea = -1;
+            // Touchpad Physical Click
+            static ULONGLONG clickHoldStartTime = 0;
+            static ULONGLONG clickLastRepeatTime = 0;
             if (state.btnClick != prevState.btnClick) {
+                SendAction(g_config.padClick, state.btnClick);
                 if (state.btnClick) {
-                    if (state.isTouching) {
-                        float dx = state.touchX - 15.5f;
-                        float dy = state.touchY - 15.5f;
-                        float distSq = dx*dx + dy*dy;
-                        if (distSq < 40.0f) activeTouchArea = 0;
-                        else {
-                            float angle = atan2(dy, dx) * 180.0f / 3.14159f;
-                            if (angle > -45 && angle <= 45) activeTouchArea = 2; // R
-                            else if (angle > 45 && angle <= 135) activeTouchArea = 3; // D
-                            else if (angle > -135 && angle <= -45) activeTouchArea = 1; // U
-                            else activeTouchArea = 4; // L
+                    clickHoldStartTime = GetTickCount64();
+                    clickLastRepeatTime = clickHoldStartTime;
+                }
+            } else if (state.btnClick) {
+                ActionMap act = g_config.padClick;
+                bool isKey = (act.key != 0 && act.key != VK_LBUTTON && act.key != VK_RBUTTON && act.key != VK_MBUTTON && act.key != VK_XBUTTON1 && act.key != VK_XBUTTON2) ||
+                             (act.mod != 0 && act.mod != VK_LBUTTON && act.mod != VK_RBUTTON && act.mod != VK_MBUTTON && act.mod != VK_XBUTTON1 && act.mod != VK_XBUTTON2);
+                if (isKey) {
+                    ULONGLONG now = GetTickCount64();
+                    if (now - clickHoldStartTime > 400) {
+                        if (now - clickLastRepeatTime > 33) {
+                            SendAction(act, true);
+                            clickLastRepeatTime = now;
                         }
-                    } else {
-                        activeTouchArea = 0;
                     }
-                    
-                    int action = 3;
-                    if (activeTouchArea == 0) action = g_config.touchCAction;
-                    else if (activeTouchArea == 1) action = g_config.touchUAction;
-                    else if (activeTouchArea == 2) action = g_config.touchRAction;
-                    else if (activeTouchArea == 3) action = g_config.touchDAction;
-                    else if (activeTouchArea == 4) action = g_config.touchLAction;
-                    
-                    SendMouseBtn(action, true);
-                } else {
-                    int action = 3;
-                    if (activeTouchArea == 0) action = g_config.touchCAction;
-                    else if (activeTouchArea == 1) action = g_config.touchUAction;
-                    else if (activeTouchArea == 2) action = g_config.touchRAction;
-                    else if (activeTouchArea == 3) action = g_config.touchDAction;
-                    else if (activeTouchArea == 4) action = g_config.touchLAction;
-                    
-                    SendMouseBtn(action, false);
-                    activeTouchArea = -1;
+                }
+            }
+
+            // Touch Area Activation
+            static int activeTouchArea = -1;
+            int currentTouchArea = -1;
+            
+            if (state.isTouching) {
+                float dx = state.touchX - 15.5f;
+                float dy = state.touchY - 15.5f;
+                float distSq = dx*dx + dy*dy;
+                if (distSq < 40.0f) currentTouchArea = 0;
+                else {
+                    float angle = atan2(dy, dx) * 180.0f / 3.14159f;
+                    if (angle > -45 && angle <= 45) currentTouchArea = 2; // R
+                    else if (angle > 45 && angle <= 135) currentTouchArea = 3; // D
+                    else if (angle > -135 && angle <= -45) currentTouchArea = 1; // U
+                    else currentTouchArea = 4; // L
+                }
+            }
+
+            static ULONGLONG holdStartTime = 0;
+            static ULONGLONG lastRepeatTime = 0;
+
+            auto getTouchMap = [](int area) -> ActionMap {
+                if (area == 0) return g_config.touchC;
+                if (area == 1) return g_config.touchU;
+                if (area == 2) return g_config.touchR;
+                if (area == 3) return g_config.touchD;
+                if (area == 4) return g_config.touchL;
+                return {0, 0};
+            };
+
+            if (currentTouchArea != activeTouchArea) {
+                if (activeTouchArea != -1) {
+                    SendAction(getTouchMap(activeTouchArea), false);
+                }
+                if (currentTouchArea != -1) {
+                    SendAction(getTouchMap(currentTouchArea), true);
+                    holdStartTime = GetTickCount64();
+                    lastRepeatTime = holdStartTime;
+                }
+                activeTouchArea = currentTouchArea;
+            } else if (activeTouchArea != -1) {
+                // Auto-repeat for keyboard keys
+                ActionMap act = getTouchMap(activeTouchArea);
+                bool isKey = (act.key != 0 && act.key != VK_LBUTTON && act.key != VK_RBUTTON && act.key != VK_MBUTTON && act.key != VK_XBUTTON1 && act.key != VK_XBUTTON2) ||
+                             (act.mod != 0 && act.mod != VK_LBUTTON && act.mod != VK_RBUTTON && act.mod != VK_MBUTTON && act.mod != VK_XBUTTON1 && act.mod != VK_XBUTTON2);
+                if (isKey) {
+                    ULONGLONG now = GetTickCount64();
+                    if (now - holdStartTime > 400) { 
+                        if (now - lastRepeatTime > 33) { 
+                            SendAction(act, true);
+                            lastRepeatTime = now;
+                        }
+                    }
                 }
             }
             
             // Home button release triggers normal action if it wasn't part of a combo
             if (!state.btnHome && prevState.btnHome) {
                 if (!homeComboTriggered && !state.btnApp) {
-                    SendMouseBtn(g_config.homeAction, true);
-                    SendMouseBtn(g_config.homeAction, false);
+                    SendAction(g_config.home, true);
+                    SendAction(g_config.home, false);
                 }
             }
             
             // App button release triggers normal action if it wasn't part of a combo
             if (!state.btnApp && prevState.btnApp) {
                 if (!appComboTriggered && !state.btnVolPlus && !state.btnVolMinus && !state.btnHome) {
-                    SendMouseBtn(g_config.appAction, true);
-                    SendMouseBtn(g_config.appAction, false);
+                    SendAction(g_config.app, true);
+                    SendAction(g_config.app, false);
                 }
             }
 
@@ -545,8 +634,115 @@ public:
 
 DaydreamController controller;
 
+int g_mappingTarget = 0;
+HHOOK g_hKeyboardHook = NULL;
+HHOOK g_hMouseHook = NULL;
+int g_mappedMod = 0;
+int g_mappedKey = 0;
+
+const wchar_t* GetKeyName(int vk) {
+    if (vk == 0) return L"None";
+    if (vk == VK_LBUTTON) return L"LClick";
+    if (vk == VK_RBUTTON) return L"RClick";
+    if (vk == VK_MBUTTON) return L"MClick";
+    if (vk == VK_XBUTTON1) return L"X1Click";
+    if (vk == VK_XBUTTON2) return L"X2Click";
+    static wchar_t name[64];
+    UINT scanCode = MapVirtualKey(vk, MAPVK_VK_TO_VSC);
+    switch (vk) {
+        case VK_LEFT: case VK_UP: case VK_RIGHT: case VK_DOWN:
+        case VK_PRIOR: case VK_NEXT: case VK_END: case VK_HOME:
+        case VK_INSERT: case VK_DELETE: case VK_DIVIDE: case VK_NUMLOCK:
+            scanCode |= KF_EXTENDED; break;
+    }
+    if (GetKeyNameText(scanCode << 16, name, 64) == 0) swprintf_s(name, L"Key:0x%X", vk);
+    return name;
+}
+
+std::wstring GetComboName(ActionMap act) {
+    if (act.mod == 0 && act.key == 0) return L"None";
+    if (act.mod == 0) return GetKeyName(act.key);
+    if (act.key == 0) return GetKeyName(act.mod);
+    return std::wstring(GetKeyName(act.mod)) + L" + " + GetKeyName(act.key);
+}
+
+void CompleteMapping(int mod, int key) {
+    ActionMap act = {mod, key};
+    if (g_mappingTarget == IDC_BTN_TOUCH_C) g_config.touchC = act;
+    else if (g_mappingTarget == IDC_BTN_TOUCH_U) g_config.touchU = act;
+    else if (g_mappingTarget == IDC_BTN_TOUCH_R) g_config.touchR = act;
+    else if (g_mappingTarget == IDC_BTN_TOUCH_D) g_config.touchD = act;
+    else if (g_mappingTarget == IDC_BTN_TOUCH_L) g_config.touchL = act;
+    else if (g_mappingTarget == IDC_BTN_TOUCH_CLICK) g_config.padClick = act;
+    else if (g_mappingTarget == IDC_BTN_HOME) g_config.home = act;
+    else if (g_mappingTarget == IDC_BTN_APP) g_config.app = act;
+    
+    SetDlgItemText(g_hConfigDlg, g_mappingTarget, GetComboName(act).c_str());
+    if (g_hKeyboardHook) { UnhookWindowsHookEx(g_hKeyboardHook); g_hKeyboardHook = NULL; }
+    if (g_hMouseHook) { UnhookWindowsHookEx(g_hMouseHook); g_hMouseHook = NULL; }
+    g_mappingTarget = 0;
+}
+
+void HandleHookInput(int vk, bool down) {
+    if (vk == VK_ESCAPE) {
+        CompleteMapping(0, 0); // Escape clears
+        return;
+    }
+    if (down) {
+        if (g_mappedMod == 0) g_mappedMod = vk;
+        else if (g_mappedKey == 0 && vk != g_mappedMod) {
+            g_mappedKey = vk;
+            CompleteMapping(g_mappedMod, g_mappedKey);
+        }
+    } else {
+        if (g_mappedMod == vk && g_mappedKey == 0) {
+            CompleteMapping(0, g_mappedMod); 
+        }
+    }
+}
+
+LRESULT CALLBACK CatchKeyKeyboardHook(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode == HC_ACTION) {
+        KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
+        if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) HandleHookInput(p->vkCode, true);
+        else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) HandleHookInput(p->vkCode, false);
+        return 1;
+    }
+    return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+}
+
+LRESULT CALLBACK CatchKeyMouseHook(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode == HC_ACTION) {
+        int vk = 0;
+        if (wParam == WM_LBUTTONDOWN || wParam == WM_LBUTTONUP) vk = VK_LBUTTON;
+        else if (wParam == WM_RBUTTONDOWN || wParam == WM_RBUTTONUP) vk = VK_RBUTTON;
+        else if (wParam == WM_MBUTTONDOWN || wParam == WM_MBUTTONUP) vk = VK_MBUTTON;
+        else if (wParam == WM_XBUTTONDOWN || wParam == WM_XBUTTONUP) {
+            MSLLHOOKSTRUCT* p = (MSLLHOOKSTRUCT*)lParam;
+            vk = (HIWORD(p->mouseData) == XBUTTON1) ? VK_XBUTTON1 : VK_XBUTTON2;
+        }
+        if (vk != 0) {
+            bool down = (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN || wParam == WM_XBUTTONDOWN);
+            HandleHookInput(vk, down);
+            return 1;
+        }
+    }
+    return CallNextHookEx(g_hMouseHook, nCode, wParam, lParam);
+}
+
+void StartMapping(HWND hwnd, int btnId) {
+    if (g_hKeyboardHook) { UnhookWindowsHookEx(g_hKeyboardHook); g_hKeyboardHook = NULL; }
+    if (g_hMouseHook) { UnhookWindowsHookEx(g_hMouseHook); g_hMouseHook = NULL; }
+    
+    g_mappingTarget = btnId;
+    g_mappedMod = 0;
+    g_mappedKey = 0;
+    SetDlgItemText(hwnd, btnId, L"Press key(s)...");
+    g_hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, CatchKeyKeyboardHook, GetModuleHandle(NULL), 0);
+    g_hMouseHook = SetWindowsHookEx(WH_MOUSE_LL, CatchKeyMouseHook, GetModuleHandle(NULL), 0);
+}
+
 INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    const wchar_t* btnOptions[] = { L"Left Click", L"Right Click", L"Middle Click", L"None" };
     const wchar_t* modeOptions[] = { L"Gyroscope", L"Touchpad" };
     const wchar_t* volOptions[] = { L"Volume Up/Down", L"Scroll Up/Down", L"Page Up/Down" };
     switch (msg) {
@@ -569,17 +765,15 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         for (auto opt : volOptions) SendMessage(hVol, CB_ADDSTRING, 0, (LPARAM)opt);
         SendMessage(hVol, CB_SETCURSEL, g_config.volMode, 0);
 
-        HWND hTouch = GetDlgItem(hwnd, IDC_TOUCH_COMBO);
-        HWND hHome = GetDlgItem(hwnd, IDC_HOME_COMBO);
-        HWND hApp = GetDlgItem(hwnd, IDC_APP_COMBO);
-        for (auto opt : btnOptions) {
-            SendMessage(hTouch, CB_ADDSTRING, 0, (LPARAM)opt);
-            SendMessage(hHome, CB_ADDSTRING, 0, (LPARAM)opt);
-            SendMessage(hApp, CB_ADDSTRING, 0, (LPARAM)opt);
-        }
-        SendMessage(hTouch, CB_SETCURSEL, g_config.touchCAction, 0);
-        SendMessage(hHome, CB_SETCURSEL, g_config.homeAction, 0);
-        SendMessage(hApp, CB_SETCURSEL, g_config.appAction, 0);
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_C, GetComboName(g_config.touchC).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_U, GetComboName(g_config.touchU).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_R, GetComboName(g_config.touchR).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_D, GetComboName(g_config.touchD).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_L, GetComboName(g_config.touchL).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_TOUCH_CLICK, GetComboName(g_config.padClick).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_HOME, GetComboName(g_config.home).c_str());
+        SetDlgItemText(hwnd, IDC_BTN_APP, GetComboName(g_config.app).c_str());
+        
         SetTimer(hwnd, 2, 100, NULL);
         return (INT_PTR)TRUE;
     }
@@ -607,6 +801,12 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         }
         break;
     case WM_COMMAND:
+        if (LOWORD(wParam) == IDC_BTN_TOUCH_C || LOWORD(wParam) == IDC_BTN_TOUCH_U || LOWORD(wParam) == IDC_BTN_TOUCH_R || 
+            LOWORD(wParam) == IDC_BTN_TOUCH_D || LOWORD(wParam) == IDC_BTN_TOUCH_L || LOWORD(wParam) == IDC_BTN_TOUCH_CLICK || 
+            LOWORD(wParam) == IDC_BTN_HOME || LOWORD(wParam) == IDC_BTN_APP) {
+            StartMapping(hwnd, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
         if (LOWORD(wParam) == IDC_TOGGLE_SERVICE_BTN) {
             g_serviceRunning = !g_serviceRunning;
             SetDlgItemText(hwnd, IDC_TOGGLE_SERVICE_BTN, g_serviceRunning ? L"Stop Service" : L"Start Service");
@@ -622,9 +822,8 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             g_config.touchSens = std::wcstof(buf, nullptr);
             GetDlgItemText(hwnd, IDC_TOUCH_ACCEL_EDIT, buf, 64);
             g_config.touchAccel = std::wcstof(buf, nullptr);
-            g_config.touchCAction = (int)SendMessage(GetDlgItem(hwnd, IDC_TOUCH_COMBO), CB_GETCURSEL, 0, 0);
-            g_config.homeAction = (int)SendMessage(GetDlgItem(hwnd, IDC_HOME_COMBO), CB_GETCURSEL, 0, 0);
-            g_config.appAction = (int)SendMessage(GetDlgItem(hwnd, IDC_APP_COMBO), CB_GETCURSEL, 0, 0);
+            
+            // VKs are already updated by hooks directly into g_config
             SaveConfig();
             TriggerOSD(L"Settings Saved");
             return (INT_PTR)TRUE;
@@ -644,6 +843,9 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         }
         break;
     case WM_CLOSE:
+        if (g_hKeyboardHook) { UnhookWindowsHookEx(g_hKeyboardHook); g_hKeyboardHook = NULL; }
+        if (g_hMouseHook) { UnhookWindowsHookEx(g_hMouseHook); g_hMouseHook = NULL; }
+        g_mappingTarget = 0;
         KillTimer(hwnd, 2);
         g_hConfigDlg = NULL;
         EndDialog(hwnd, IDCANCEL);

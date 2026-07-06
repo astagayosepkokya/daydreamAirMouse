@@ -2,9 +2,14 @@
 #define IDD_CONFIG_DIALOG    102
 #define IDC_GYRO_SENS_EDIT   1001
 #define IDC_CALIBRATE_BTN    1002
-#define IDC_TOUCH_COMBO      1003
-#define IDC_HOME_COMBO       1004
-#define IDC_APP_COMBO        1005
+#define IDC_BTN_TOUCH_C      1003
+#define IDC_BTN_TOUCH_U      1016
+#define IDC_BTN_TOUCH_R      1017
+#define IDC_BTN_TOUCH_D      1018
+#define IDC_BTN_TOUCH_L      1019
+#define IDC_BTN_TOUCH_CLICK  1020
+#define IDC_BTN_HOME         1004
+#define IDC_BTN_APP          1005
 #define IDC_SAVE_BTN         1006
 #define IDC_CANCEL_BTN       1007
 #define ID_TRAY_SETTINGS     1008
