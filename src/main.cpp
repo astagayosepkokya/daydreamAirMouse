@@ -36,7 +36,11 @@ struct AppConfig {
     float gyroSens = 0.025f;
     float touchSens = 1.0f;
     float touchAccel = 1.5f;    
-    int touchAction = 0; 
+    int touchCAction = 0; 
+    int touchUAction = 3; 
+    int touchRAction = 3; 
+    int touchDAction = 3; 
+    int touchLAction = 3; 
     int homeAction = 1;  
     int appAction = 2;   
 };
@@ -64,7 +68,11 @@ void LoadConfig() {
     GetPrivateProfileString(L"Settings", L"TouchAccel", L"1.5", buf, 64, path);
     g_config.touchAccel = std::wcstof(buf, nullptr);
 
-    g_config.touchAction = GetPrivateProfileInt(L"Mappings", L"Touch", 0, path);
+    g_config.touchCAction = GetPrivateProfileInt(L"Mappings", L"TouchC", 0, path);
+    g_config.touchUAction = GetPrivateProfileInt(L"Mappings", L"TouchU", 3, path);
+    g_config.touchRAction = GetPrivateProfileInt(L"Mappings", L"TouchR", 3, path);
+    g_config.touchDAction = GetPrivateProfileInt(L"Mappings", L"TouchD", 3, path);
+    g_config.touchLAction = GetPrivateProfileInt(L"Mappings", L"TouchL", 3, path);
     g_config.homeAction = GetPrivateProfileInt(L"Mappings", L"Home", 1, path);
     g_config.appAction = GetPrivateProfileInt(L"Mappings", L"App", 2, path);
 }
@@ -89,8 +97,16 @@ void SaveConfig() {
     swprintf_s(buf, L"%.4f", g_config.touchAccel);
     WritePrivateProfileString(L"Settings", L"TouchAccel", buf, path);
 
-    swprintf_s(buf, L"%d", g_config.touchAction);
-    WritePrivateProfileString(L"Mappings", L"Touch", buf, path);
+    swprintf_s(buf, L"%d", g_config.touchCAction);
+    WritePrivateProfileString(L"Mappings", L"TouchC", buf, path);
+    swprintf_s(buf, L"%d", g_config.touchUAction);
+    WritePrivateProfileString(L"Mappings", L"TouchU", buf, path);
+    swprintf_s(buf, L"%d", g_config.touchRAction);
+    WritePrivateProfileString(L"Mappings", L"TouchR", buf, path);
+    swprintf_s(buf, L"%d", g_config.touchDAction);
+    WritePrivateProfileString(L"Mappings", L"TouchD", buf, path);
+    swprintf_s(buf, L"%d", g_config.touchLAction);
+    WritePrivateProfileString(L"Mappings", L"TouchL", buf, path);
     swprintf_s(buf, L"%d", g_config.homeAction);
     WritePrivateProfileString(L"Mappings", L"Home", buf, path);
     swprintf_s(buf, L"%d", g_config.appAction);
@@ -416,7 +432,45 @@ public:
             }
 
             // Standard Button Actions
-            if (state.btnClick != prevState.btnClick) SendMouseBtn(g_config.touchAction, state.btnClick);
+            static int activeTouchArea = -1;
+            if (state.btnClick != prevState.btnClick) {
+                if (state.btnClick) {
+                    if (state.isTouching) {
+                        float dx = state.touchX - 15.5f;
+                        float dy = state.touchY - 15.5f;
+                        float distSq = dx*dx + dy*dy;
+                        if (distSq < 40.0f) activeTouchArea = 0;
+                        else {
+                            float angle = atan2(dy, dx) * 180.0f / 3.14159f;
+                            if (angle > -45 && angle <= 45) activeTouchArea = 2; // R
+                            else if (angle > 45 && angle <= 135) activeTouchArea = 3; // D
+                            else if (angle > -135 && angle <= -45) activeTouchArea = 1; // U
+                            else activeTouchArea = 4; // L
+                        }
+                    } else {
+                        activeTouchArea = 0;
+                    }
+                    
+                    int action = 3;
+                    if (activeTouchArea == 0) action = g_config.touchCAction;
+                    else if (activeTouchArea == 1) action = g_config.touchUAction;
+                    else if (activeTouchArea == 2) action = g_config.touchRAction;
+                    else if (activeTouchArea == 3) action = g_config.touchDAction;
+                    else if (activeTouchArea == 4) action = g_config.touchLAction;
+                    
+                    SendMouseBtn(action, true);
+                } else {
+                    int action = 3;
+                    if (activeTouchArea == 0) action = g_config.touchCAction;
+                    else if (activeTouchArea == 1) action = g_config.touchUAction;
+                    else if (activeTouchArea == 2) action = g_config.touchRAction;
+                    else if (activeTouchArea == 3) action = g_config.touchDAction;
+                    else if (activeTouchArea == 4) action = g_config.touchLAction;
+                    
+                    SendMouseBtn(action, false);
+                    activeTouchArea = -1;
+                }
+            }
             
             // Home button release triggers normal action if it wasn't part of a combo
             if (!state.btnHome && prevState.btnHome) {
@@ -436,24 +490,14 @@ public:
 
             int dx = 0, dy = 0;
             if (g_config.mouseMode == 0) {
-                if (state.isTouching) {
-                    if (state.touchY < 6 || state.touchY > 25) {
-                        ULONGLONG now = GetTickCount64();
-                        if (now - lastScrollTime > 150) {
-                            SendScroll(state.touchY < 6 ? 120 : -120);
-                            lastScrollTime = now;
-                        }
-                    } else {
-                        int vY = -(state.gyroZ - gOffZ);
-                        int vP = -(state.gyroX - gOffX);
-                        const int deadzone = 25; 
-                        if (abs(vY) > deadzone || abs(vP) > deadzone) {
-                            rxAccum += (float)vY * g_config.gyroSens;
-                            ryAccum += (float)vP * g_config.gyroSens;
-                            dx = (int)rxAccum; dy = (int)ryAccum;
-                            rxAccum -= dx; ryAccum -= dy;
-                        }
-                    }
+                int vY = -(state.gyroZ - gOffZ);
+                int vP = -(state.gyroX - gOffX);
+                const int deadzone = 25; 
+                if (abs(vY) > deadzone || abs(vP) > deadzone) {
+                    rxAccum += (float)vY * g_config.gyroSens;
+                    ryAccum += (float)vP * g_config.gyroSens;
+                    dx = (int)rxAccum; dy = (int)ryAccum;
+                    rxAccum -= dx; ryAccum -= dy;
                 } else { rxAccum = 0; ryAccum = 0; }
             } else {
                 if (state.isTouching && prevState.isTouching) {
@@ -533,7 +577,7 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             SendMessage(hHome, CB_ADDSTRING, 0, (LPARAM)opt);
             SendMessage(hApp, CB_ADDSTRING, 0, (LPARAM)opt);
         }
-        SendMessage(hTouch, CB_SETCURSEL, g_config.touchAction, 0);
+        SendMessage(hTouch, CB_SETCURSEL, g_config.touchCAction, 0);
         SendMessage(hHome, CB_SETCURSEL, g_config.homeAction, 0);
         SendMessage(hApp, CB_SETCURSEL, g_config.appAction, 0);
         SetTimer(hwnd, 2, 100, NULL);
@@ -578,7 +622,7 @@ INT_PTR CALLBACK ConfigDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             g_config.touchSens = std::wcstof(buf, nullptr);
             GetDlgItemText(hwnd, IDC_TOUCH_ACCEL_EDIT, buf, 64);
             g_config.touchAccel = std::wcstof(buf, nullptr);
-            g_config.touchAction = (int)SendMessage(GetDlgItem(hwnd, IDC_TOUCH_COMBO), CB_GETCURSEL, 0, 0);
+            g_config.touchCAction = (int)SendMessage(GetDlgItem(hwnd, IDC_TOUCH_COMBO), CB_GETCURSEL, 0, 0);
             g_config.homeAction = (int)SendMessage(GetDlgItem(hwnd, IDC_HOME_COMBO), CB_GETCURSEL, 0, 0);
             g_config.appAction = (int)SendMessage(GetDlgItem(hwnd, IDC_APP_COMBO), CB_GETCURSEL, 0, 0);
             SaveConfig();
